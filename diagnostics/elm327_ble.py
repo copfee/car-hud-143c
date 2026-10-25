@@ -427,8 +427,8 @@ def parse_args(argv=None):
     p.add_argument('--cache',default=str(ROOT.parent/'elm327_protocol_cache.json'))
     a=p.parse_args(argv)
     if a.brake_pressure:
-        if a.profile not in (None,'mercedes-w205-2020'):p.error('--brake-pressure 与非奔驰配置冲突')
-        a.profile='mercedes-w205-2020';print('迁移提示：建议使用 --profile mercedes-w205-2020',file=sys.stderr)
+        if a.profile not in (None,'mercedes-c260-2021'):p.error('--brake-pressure 与非奔驰配置冲突')
+        a.profile='mercedes-c260-2021';print('迁移提示：建议使用 --profile mercedes-c260-2021',file=sys.stderr)
     a.profile=a.profile or 'generic'
     if a.protocol is None:a.protocol=str(PROFILES[a.profile].get('default_protocol',0) or 'auto')
     if not 1<=a.samples<=60 or not .2<=a.interval<=10:p.error('samples 应为1～60，interval应为0.2～10秒')

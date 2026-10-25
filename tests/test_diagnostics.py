@@ -79,7 +79,7 @@ class Pure(unittest.TestCase):
     def test_defaults_and_conflicts(self):
         a=m.parse_args([]);self.assertEqual((a.profile,a.protocol),('generic','auto'))
         with contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(m.parse_args(['--brake-pressure']).profile,'mercedes-w205-2020')
+            self.assertEqual(m.parse_args(['--brake-pressure']).profile,'mercedes-c260-2021')
         with self.assertRaises(SystemExit),contextlib.redirect_stderr(io.StringIO()):m.parse_args(['--profile','generic','--brake-pressure'])
         for p in range(1,10):self.assertEqual(m.parse_args(['--protocol',str(p)]).protocol,str(p))
     def test_no_can_config_on_legacy(self):
@@ -117,7 +117,7 @@ class Async(unittest.IsolatedAsyncioTestCase):
         self.assertIn('ATSP0',fake.commands)
         self.assertFalse(any(x.startswith('ATTP') for x in fake.commands))
     async def test_pressure_does_not_refresh_standard_heartbeat(self):
-        fake=Fake();c=m.ObdController(fake,m.parse_args(['--profile','mercedes-w205-2020']))
+        fake=Fake();c=m.ObdController(fake,m.parse_args(['--profile','mercedes-c260-2021']))
         await c.initialize();before=c.last_standard;original=fake.command
         async def command(cmd,timeout=1.8):
             if cmd==m.PRESSURE['command']:

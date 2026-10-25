@@ -152,7 +152,7 @@ python3 -m unittest discover -v -s tests -p 'test_*.py'
 |奔驰 C260 2021|自动发现；标准协议 7 验证后才启用压力扩展|历史实车日志存在标准协议 7 和压力协议 6 响应；当前通用固件仍需回归|
 |Honda CL300 2023|协议 5：KWP 快初始化，10.4 kbaud|Car Scanner 截图及电脑脚本有响应证据；当前 HUD 固件和全部 PID 尚未完成实车验收|
 
-奔驰配置内部 ID 仍为 `mercedes-w205-2020`，用于兼容旧命令；界面名称已改为“奔驰 C260 2021”。不要根据这个内部 ID 判断年款。
+奔驰配置 ID 统一为 `mercedes-c260-2021`，界面显示“奔驰 C260 2021”。命令行、共同配置和固件生成表采用同一名称；固件持久化车型编号仍为1，已有车型选择可继续恢复。
 
 奔驰压力是车型扩展：标准通道协议 7，压力通道协议 6、`7E2 → 7EA`、请求 `222002`。仅显式选择奔驰配置后使用，不能作为通用压力定义推广到其他车。通用和 Honda 模式不启用该查询。
 
@@ -193,7 +193,7 @@ python3 -m venv .tools/obd-env
 ```bash
 .tools/obd-env/bin/python diagnostics/elm327_ble.py --read --extended --profile generic --log .tools/obd-read.log
 .tools/obd-env/bin/python diagnostics/elm327_ble.py --live --profile generic --log .tools/obd-live.log
-.tools/obd-env/bin/python diagnostics/elm327_ble.py --live --profile mercedes-w205-2020
+.tools/obd-env/bin/python diagnostics/elm327_ble.py --live --profile mercedes-c260-2021
 ```
 
 支持 `--protocol auto` 或 `1…9`、`--device`、`--log` 等参数，`--help` 可查看完整选项。按支持位图读取，并低优先级读取 VIN 与 ECU 名称。终端原地更新，Ctrl+C 释放连接。
