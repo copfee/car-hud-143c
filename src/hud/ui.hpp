@@ -14,10 +14,16 @@ public:
     uint8_t protocol()const;
     void showPage(PageId page, bool animated=true);
     bool scrolling() const;
+    BlePeer selectedBluetoothPeer() const{return chosenPeer_;}
 private:
     lv_obj_t *splash_=nullptr,*logo_=nullptr,*boot_=nullptr,*dash_=nullptr,*settingsScroll_=nullptr,*tiles_=nullptr;
     lv_obj_t* pages_[PageCount]{};
     lv_obj_t *status_=nullptr,*countdown_=nullptr,*spinner_=nullptr,*retry_=nullptr,*demoButton_=nullptr;
+    lv_obj_t *bootPeer_=nullptr,*bootBluetooth_=nullptr,*bluetoothScreen_=nullptr,*bluetoothList_=nullptr,*bluetoothStatus_=nullptr,*scanButton_=nullptr,*cancelBluetooth_=nullptr;
+    lv_obj_t *savedPeer_=nullptr,*peerState_=nullptr;
+    std::vector<BlePeer> renderedPeers_;
+    BlePeer chosenPeer_;
+    uint32_t bluetoothRevision_=0xffffffffu;
     lv_obj_t *number_[Count]{},*gauge_=nullptr,*pedalBar_=nullptr,*throttleBar_=nullptr,*brakeBar_=nullptr;
     lv_obj_t *demoBadge_[PageCount]{},*dots_[PageCount][PageCount]{},*context_=nullptr,*slider_=nullptr,*mirror_=nullptr;
     lv_obj_t *batteryValue_=nullptr,*batteryState_=nullptr,*batteryFill_=nullptr,*brightnessValue_=nullptr;
@@ -35,5 +41,7 @@ private:
     static void scrollEvent(lv_event_t* e);
     void createSettings(lv_obj_t* page);
     void refreshSettings(const Snapshot& s,uint32_t now);
+    void createBluetooth();
+    void refreshBluetooth(const Snapshot& s);
 };
 }

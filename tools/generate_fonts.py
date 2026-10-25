@@ -15,4 +15,7 @@ subprocess.run(['node', str(args.converter.resolve()), '--font', str(args.font_s
                 '--size', '18', '--bpp', '4', '--format', 'lvgl', '--lv-font-name', 'hud_cn_18',
                 '--range', '0x20-0x7e', '--symbols', ''.join(symbols), '--no-compress',
                 '--output', str(root/'src/hud/hud_cn_18.c')], check=True)
+output=root/'src/hud/hud_cn_18.c'
+portable=output.read_text().replace(str(args.font_source.resolve()),args.font_source.name).replace(str(root)+'/', '')
+output.write_text(portable.rstrip()+'\n')
 print(f'Chinese/punctuation glyphs: {len(symbols)}')

@@ -21,6 +21,25 @@ int main(){
     Snapshot boot;assert(boot.mode==Mode::Splash&&!connectionAllowed(boot.mode));
     assert(!connectionTimedOut(boot.mode,100000,0));
     assert(connectionAllowed(Mode::Loading)&&connectionAllowed(Mode::Timeout)&&!connectionAllowed(Mode::Live)&&!connectionAllowed(Mode::Demo));
+    assert(!connectionAllowed(Mode::Bluetooth)&&!connectionTimedOut(Mode::Bluetooth,100000,0));
+    BluetoothInfo bluetooth;assert(!validPeer(bluetooth.saved)&&!validPeer(bluetooth.target));
+    BlePeer peer{"AA:BB:CC:DD:EE:FF","IOS-Vlink",1,-45,true};assert(validPeer(peer));
+    auto stored=encodePeer(peer);auto restored=decodePeer(stored);assert(samePeer(peer,restored)&&restored.name==peer.name&&restored.addressType==1);
+    assert(encodePeer(restored)==stored&&restored.rssi==0);
+    for(const auto& bad:{std::string{},std::string("garbage"),std::string("2\n1\naa:bb:cc:dd:ee:ff\nAdapter"),std::string("1\n4\naa:bb:cc:dd:ee:ff\nAdapter"),std::string("1\n1\n00:00:00:00:00:00\nAdapter")})assert(!validPeer(decodePeer(bad)));
+    auto invalid=peer;invalid.address="AA:BB:CC:DD:EE";assert(!validPeer(invalid)&&encodePeer(invalid).empty()&&!chooseBluetoothPeer(bluetooth,invalid));
+    assert(cleanDeviceName("Adapter\n\r\t")=="Adapter   "&&cleanDeviceName("")=="未命名设备");
+    assert(cleanDeviceName(std::string(63,'A')+"中")==std::string(63,'A'));
+    assert(cleanDeviceName(std::string("bad\xff",4))=="bad?");
+    addBluetoothDevice(bluetooth,peer);auto duplicate=peer;duplicate.rssi=-30;duplicate.obdService=false;addBluetoothDevice(bluetooth,duplicate);
+    assert(bluetooth.devices.size()==1&&bluetooth.devices[0].rssi==-30&&bluetooth.devices[0].obdService);
+    auto other=peer;other.address="11:22:33:44:55:66";other.rssi=-10;other.obdService=false;addBluetoothDevice(bluetooth,other);
+    assert(bluetooth.devices.size()==2&&bluetooth.devices[0].obdService);
+    bluetooth.saved=restored;assert(chooseBluetoothPeer(bluetooth,other));assert(samePeer(bluetooth.saved,peer)&&samePeer(bluetooth.target,other));
+    assert(!confirmBluetoothPeer(bluetooth,peer)&&samePeer(bluetooth.saved,peer)); // Late result cannot replace the current selection.
+    assert(confirmBluetoothPeer(bluetooth,other)&&samePeer(bluetooth.saved,other));
+    for(unsigned i=0;i<100;++i){auto candidate=peer;char address[20];snprintf(address,sizeof(address),"01:02:03:04:05:%02x",i);candidate.address=address;candidate.rssi=-int(i)-1;addBluetoothDevice(bluetooth,candidate);}
+    assert(bluetooth.devices.size()==MaxBluetoothDevices);
     // The 60-second timeout starts after the three-second splash, not at power-on.
     assert(!connectionTimedOut(Mode::Loading,62999,SplashDurationMs)&&connectionTimedOut(Mode::Loading,63000,SplashDurationMs));
     for(int saved:{10,50,100}){assert(effectiveBrightness(Mode::Splash,saved)==50);assert(effectiveBrightness(Mode::Loading,saved)==saved);}

@@ -6,6 +6,62 @@
 #include <sstream>
 
 namespace hud {
+bool validPeer(const BlePeer& peer){
+    if(peer.address.size()!=17||peer.addressType>3)return false;
+    bool nonzero=false;
+    for(size_t i=0;i<17;++i){unsigned char c=peer.address[i];if(i%3==2){if(c!=':')return false;}else{if(!std::isxdigit(c))return false;nonzero|=c!='0';}}
+    return nonzero;
+}
+bool samePeer(const BlePeer& a,const BlePeer& b){
+    if(!validPeer(a)||!validPeer(b)||a.addressType!=b.addressType)return false;
+    for(size_t i=0;i<17;++i)if(std::tolower(static_cast<unsigned char>(a.address[i]))!=std::tolower(static_cast<unsigned char>(b.address[i])))return false;
+    return true;
+}
+std::string cleanDeviceName(const std::string& name){
+    std::string out;size_t at=0;
+    while(at<name.size()&&out.size()<64){
+        unsigned char c=name[at];size_t n=c<0x80?1:(c>=0xC2&&c<=0xDF)?2:(c>=0xE0&&c<=0xEF)?3:(c>=0xF0&&c<=0xF4)?4:0;
+        bool ok=n&&at+n<=name.size();
+        for(size_t j=1;ok&&j<n;++j)ok=(static_cast<unsigned char>(name[at+j])&0xC0)==0x80;
+        if(ok&&n==3){auto second=static_cast<unsigned char>(name[at+1]);ok=(c!=0xE0||second>=0xA0)&&(c!=0xED||second<0xA0);}
+        if(ok&&n==4){auto second=static_cast<unsigned char>(name[at+1]);ok=(c!=0xF0||second>=0x90)&&(c!=0xF4||second<0x90);}
+        if(!ok){out+='?';++at;continue;}
+        if(out.size()+n>64)break;
+        if(n==1&&(c<32||c==127))out+=' ';else out.append(name,at,n);
+        at+=n;
+    }
+    return out.empty()?"未命名设备":out;
+}
+std::string encodePeer(const BlePeer& peer){
+    if(!validPeer(peer))return {};
+    std::string address=peer.address;for(auto& c:address)c=char(std::tolower(static_cast<unsigned char>(c)));
+    return "1\n"+std::to_string(peer.addressType)+"\n"+address+"\n"+cleanDeviceName(peer.name);
+}
+BlePeer decodePeer(const std::string& stored){
+    if(stored.size()<22||stored.size()>86||stored.compare(0,2,"1\n")!=0||stored[2]<'0'||stored[2]>'3'||stored[3]!='\n'||stored[21]!='\n')return {};
+    BlePeer peer;peer.addressType=uint8_t(stored[2]-'0');peer.address=stored.substr(4,17);peer.name=cleanDeviceName(stored.substr(22));
+    return validPeer(peer)?peer:BlePeer{};
+}
+void addBluetoothDevice(BluetoothInfo& info,BlePeer peer){
+    if(!validPeer(peer))return;
+    peer.name=cleanDeviceName(peer.name);
+    auto it=std::find_if(info.devices.begin(),info.devices.end(),[&](const BlePeer& old){return samePeer(old,peer);});
+    if(it!=info.devices.end()){peer.obdService|=it->obdService;*it=peer;}else info.devices.push_back(peer);
+    std::sort(info.devices.begin(),info.devices.end(),[](const BlePeer& a,const BlePeer& b){
+        if(a.obdService!=b.obdService)return a.obdService;
+        if(a.rssi!=b.rssi)return a.rssi>b.rssi;
+        return a.address<b.address;
+    });
+    if(info.devices.size()>MaxBluetoothDevices)info.devices.resize(MaxBluetoothDevices);
+}
+bool chooseBluetoothPeer(BluetoothInfo& info,const BlePeer& peer){
+    if(!validPeer(peer))return false;
+    info.target=peer;info.target.name=cleanDeviceName(peer.name);info.devices.clear();info.scanning=false;++info.revision;return true;
+}
+bool confirmBluetoothPeer(BluetoothInfo& info,const BlePeer& connected){
+    if(!samePeer(info.target,connected))return false;
+    info.saved=info.target;return true;
+}
 uint8_t splashOpacity(uint32_t elapsed){
     if(elapsed>=SplashDurationMs)return 0;
     if(elapsed<SplashFadeMs)return uint8_t((elapsed*255+SplashFadeMs/2)/SplashFadeMs);

@@ -7,7 +7,7 @@
 
 namespace hud {
 enum Metric : uint8_t { Speed, Rpm, Coolant, Fuel, Odometer, Pedal, Throttle, Pressure, Count };
-enum class Mode : uint8_t { Loading, Timeout, Live, Demo, Splash };
+enum class Mode : uint8_t { Loading, Timeout, Live, Demo, Splash, Bluetooth };
 enum class PageId : uint8_t { Overview, Pedals, Settings, Count };
 constexpr unsigned PageCount=unsigned(PageId::Count);
 inline bool connectionTimedOut(Mode mode,uint32_t now,uint32_t start){return mode==Mode::Loading&&int32_t(now-start)>=int32_t(ConnectionTimeoutMs);}
@@ -22,13 +22,13 @@ public:
     uint32_t elapsed(uint32_t now) const;
     bool takeCompletion(uint32_t now);
 };
-enum class Action : uint8_t { None, Retry, Demo, Brightness, Mirror, Profile, Protocol, Identity };
+enum class Action : uint8_t { None, Retry, Demo, Brightness, Mirror, Profile, Protocol, Identity, Bluetooth, ScanBluetooth, SelectBluetooth, CancelBluetooth };
 enum class VehicleProfile : uint8_t { Generic, Mercedes, HondaCl300, Count };
 static_assert(unsigned(VehicleProfile::Count)==ProfileCount,"Profile definitions must match stable persisted IDs");
 inline VehicleProfile normalizeProfile(unsigned value){return value<ProfileCount?VehicleProfile(value):VehicleProfile::Generic;}
 inline uint8_t defaultProtocol(VehicleProfile profile){return ProfileDefaultProtocols[unsigned(normalizeProfile(unsigned(profile)))];}
 inline bool profileHasPressure(VehicleProfile profile){return ProfilePressureEnabled[unsigned(normalizeProfile(unsigned(profile)))];}
-enum class ConnectionState : uint8_t { Idle, Scanning, Initializing, Discovering, Capabilities, Running, WaitingEcu, Recovering, Demo };
+enum class ConnectionState : uint8_t { Idle, Scanning, Initializing, Discovering, Capabilities, Running, WaitingEcu, Recovering, Demo, Connecting };
 enum class MetricStatus : uint8_t { Unknown, Unsupported, NoData, Valid, Stale };
 struct ProtocolInfo { uint8_t configured=0, detected=0, active=0; bool verified=false; char description[80]{}; };
 struct EcuCapabilities { uint32_t source=0; std::array<bool,256> supported{},known{}; };
@@ -65,6 +65,28 @@ struct SystemInfo {
     uint32_t flashBytes=0, psramBytes=0, freeHeap=0;
     uint64_t uptimeSeconds=0;
 };
+struct BlePeer {
+    std::string address,name;
+    uint8_t addressType=0;
+    int rssi=0;
+    bool obdService=false;
+};
+constexpr unsigned MaxBluetoothDevices=24;
+struct BluetoothInfo {
+    BlePeer saved,target;
+    std::vector<BlePeer> devices;
+    bool scanning=false;
+    uint32_t revision=0;
+    std::string detail="请选择蓝牙设备";
+};
+bool validPeer(const BlePeer& peer);
+bool samePeer(const BlePeer& a,const BlePeer& b);
+std::string cleanDeviceName(const std::string& name);
+std::string encodePeer(const BlePeer& peer);
+BlePeer decodePeer(const std::string& stored);
+void addBluetoothDevice(BluetoothInfo& info,BlePeer peer);
+bool chooseBluetoothPeer(BluetoothInfo& info,const BlePeer& peer);
+bool confirmBluetoothPeer(BluetoothInfo& info,const BlePeer& connected);
 struct Snapshot {
     std::array<Sample, Count> samples{};
     Mode mode = Mode::Splash;
@@ -82,6 +104,7 @@ struct Snapshot {
     BatteryInfo battery;
     ConnectionInfo connection;
     SystemInfo system;
+    BluetoothInfo bluetooth;
 };
 inline void selectProfile(Snapshot& s,VehicleProfile profile){s.profile=normalizeProfile(unsigned(profile));s.requestedProtocol=defaultProtocol(s.profile);}
 uint32_t period(Metric m, PageId page);

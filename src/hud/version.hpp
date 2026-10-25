@@ -1,2 +1,2 @@
 #pragma once
-namespace hud { inline constexpr char FirmwareVersion[]="1.2.0-universal.4"; }
+namespace hud { inline constexpr char FirmwareVersion[]="1.3.0-bluetooth.1"; }
