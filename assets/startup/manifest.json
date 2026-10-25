@@ -1,0 +1,11 @@
+{
+  "source": "mercedes-logo-original.png",
+  "source_sha256": "730f35ea86c7c3c8a3628c96b35498dcc6d0297a6825fe112b098709f1923d8d",
+  "image": "mercedes-logo-466.png",
+  "width": 466,
+  "height": 466,
+  "background": "#000000",
+  "format": "RGB565 little-endian, opaque",
+  "raw_bytes": 434312,
+  "raw_sha256": "91c4510ea69cb23e9ff2359d7de8168e2d24fb2d0ddbf46bf6d0e381b1d25d1f"
+}

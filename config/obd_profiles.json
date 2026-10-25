@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "generic",
+      "name": "通用 OBD",
+      "pressure": false,
+      "default_protocol": 0
+    },
+    {
+      "id": "mercedes-w205-2020",
+      "name": "奔驰 C260 2021",
+      "pressure": true,
+      "default_protocol": 0
+    },
+    {
+      "id": "honda-cl300-2023",
+      "name": "Honda CL300 2023",
+      "pressure": false,
+      "default_protocol": 5,
+      "evidence": {
+        "source": "User screenshot IMG_1463.HEIC, Car Scanner",
+        "protocol": "ISO 14230-4 KWP fast init, 10.4 kbaud",
+        "ecu_name": "ECM -EngineControl",
+        "calibration_id": "0104910E01",
+        "scope": "Protocol shown connected in Car Scanner; HUD firmware and PID support require actual test"
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "name": "speed",
+      "pids": [
+        13
+      ],
+      "bytes": 1,
+      "kind": "speed",
+      "periods": [
+        333,
+        1000
+      ]
+    },
+    {
+      "name": "rpm",
+      "pids": [
+        12
+      ],
+      "bytes": 2,
+      "kind": "rpm",
+      "periods": [
+        667,
+        1000
+      ]
+    },
+    {
+      "name": "coolant",
+      "pids": [
+        5
+      ],
+      "bytes": 1,
+      "kind": "temperature",
+      "periods": [
+        5000,
+        5000
+      ]
+    },
+    {
+      "name": "fuel",
+      "pids": [
+        47
+      ],
+      "bytes": 1,
+      "kind": "percent",
+      "periods": [
+        10000,
+        10000
+      ]
+    },
+    {
+      "name": "odometer",
+      "pids": [
+        166
+      ],
+      "bytes": 4,
+      "kind": "odometer",
+      "periods": [
+        30000,
+        30000
+      ]
+    },
+    {
+      "name": "pedal",
+      "pids": [
+        90,
+        73,
+        74,
+        75
+      ],
+      "bytes": 1,
+      "kind": "percent",
+      "periods": [
+        2000,
+        250
+      ]
+    },
+    {
+      "name": "throttle",
+      "pids": [
+        17,
+        69
+      ],
+      "bytes": 1,
+      "kind": "percent",
+      "periods": [
+        2000,
+        500
+      ]
+    },
+    {
+      "name": "pressure",
+      "pids": [],
+      "bytes": 14,
+      "kind": "pressure",
+      "periods": [
+        5000,
+        500
+      ]
+    }
+  ],
+  "pressure": {
+    "protocol": 6,
+    "required_standard_protocol": 7,
+    "tx": "7E2",
+    "rx": "7EA",
+    "command": "222002",
+    "prefix": "622002",
+    "offset": 12,
+    "divisor": 65.35883831
+  },
+  "timing": {
+    "splash_ms": 3000,
+    "splash_brightness": 50,
+    "notice_ms": 60000,
+    "round_ms": 60000,
+    "cached_ms": 5000,
+    "heartbeat_ms": 5000,
+    "silence_ms": 15000,
+    "backoff_ms": [
+      2000,
+      5000,
+      10000,
+      30000
+    ],
+    "identity_retry_ms": 30000,
+    "fade_ms": 300
+  }
+}

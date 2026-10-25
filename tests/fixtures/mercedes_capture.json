@@ -1,0 +1,50 @@
+[
+  {
+    "command": "222002",
+    "protocol": 6,
+    "response": "7EA 10 2C 62 20 02 00 00 00 \r7EA 21 FF FF 00 00 13 00 FF \r7EA 22 FE 00 FF F4 00 00 32 \r7EA 23 00 00 00 00 3A 12 3A \r7EA 24 37 3A 3A FC 17 00 FC \r7EA 25 18 00 02 A8 00 02 58 \r7EA 26 00 0E 40 AA AA AA AA \r\r",
+    "source": 2026,
+    "payload": "622002000000FFFF00001300FFFE00FFF4000032000000003A123A373A3AFC1700FC180002A8000258000E40",
+    "provenance": "historical elm327_live.log; current firmware not vehicle tested"
+  },
+  {
+    "command": "010C",
+    "protocol": 7,
+    "response": "18 DA F1 58 04 41 0C 14 86 \r18 DA F1 59 04 41 0C 14 78 \r18 DA F1 5A 04 41 0C 14 78 \r18 DA F1 62 04 41 0C 14 78 \r\r",
+    "source": 417001816,
+    "payload": "410C1486",
+    "provenance": "historical elm327_live.log; current firmware not vehicle tested"
+  },
+  {
+    "command": "010D",
+    "protocol": 7,
+    "response": "18 DA F1 5A 03 41 0D 00 \r18 DA F1 58 03 41 0D 00 \r18 DA F1 59 03 41 0D 00 \r18 DA F1 62 03 41 0D 00 \r\r",
+    "source": 417001818,
+    "payload": "410D00",
+    "provenance": "historical elm327_live.log; current firmware not vehicle tested"
+  },
+  {
+    "command": "0105",
+    "protocol": 7,
+    "response": "18 DA F1 59 03 41 05 80 \r18 DA F1 58 03 41 05 80 \r18 DA F1 5A 03 41 05 80 \r18 DA F1 62 03 41 05 80 \r\r",
+    "source": 417001817,
+    "payload": "410580",
+    "provenance": "historical elm327_live.log; current firmware not vehicle tested"
+  },
+  {
+    "command": "012F",
+    "protocol": 7,
+    "response": "18 DA F1 58 03 41 2F A1 \r\r",
+    "source": 417001816,
+    "payload": "412FA1",
+    "provenance": "historical elm327_live.log; current firmware not vehicle tested"
+  },
+  {
+    "command": "01A6",
+    "protocol": 7,
+    "response": "18 DA F1 59 06 41 A6 00 0D F5 1F \r\r",
+    "source": 417001817,
+    "payload": "41A6000DF51F",
+    "provenance": "historical elm327_live.log; current firmware not vehicle tested"
+  }
+]
