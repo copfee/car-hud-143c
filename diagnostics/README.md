@@ -12,4 +12,4 @@ python3 elm327_ble.py --live --profile mercedes-w205-2020
 
 独立CL300测试：`python3 cl300_pid_test.py`，或`python3 cl300_pid_test.py --all-supported --samples 1`。默认协议5，连接上限60秒，详见CL300-PID测试说明.md。
 
-独立奔驰CAN监听：`python3 mercedes_can_monitor.py`，默认顺序测试11位与29位、500 kbit/s，各30秒；原地刷新终端，按键标记操作时间，导出原始BLE、CAN帧、逐ID统计和中文报告。只配置ELM并监听，不发送PID/UDS查询。详见[奔驰CAN监听测试说明.md](奔驰CAN监听测试说明.md)。
+当前只提供主动OBD读取工具。CAN被动监听暂不提供，作为未来可选性能优化方向记录在项目README。

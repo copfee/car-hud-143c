@@ -26,7 +26,7 @@
 - 数值采用时间驱动平滑；不支持、无效或过期显示 `--`，真实零值保留。
 - Logo 显示三秒：淡入 300ms、保持 2400ms、淡出 300ms；面板固定 50% 亮度，黑帧完成刷新后恢复用户保存值，再开始连接。
 - 60 秒后提供重试/演示操作；失败退避、熄火等待和蓝牙断连恢复由后台状态机处理。重连不重播 Logo。
-- 电脑端含通用 PID 实时仪表、CL300 标准 PID 测试、奔驰 CAN 被动监听三个工具。
+- 电脑端保留通用 PID 实时仪表与 CL300 标准 PID 测试两个工具。
 
 **软件覆盖协议不等于所有车辆已验证。** 数据是否可读，取决于车辆 ECU、网关、适配器硬件与该车型支持的 PID。当前不显示 P/R/N/D 或实际挡位；没有可靠定义的专用数据不会猜测。
 
@@ -180,7 +180,7 @@ python3 -m venv .tools/obd-env
 .tools/obd-env/bin/python -m pip install -r diagnostics/requirements.txt
 ```
 
-三个工具共用 Bleak 3.0.2 与 IOS-Vlink GATT 层，默认按 **`IOS-Vlink` 名称查找**，不含原作者电脑的设备 UUID。附近有多个同名模块时，请显式使用本机地址：`--device 地址`。macOS 的设备 UUID 与其他电脑/ESP32 的地址并不通用。macOS 首次运行需允许终端蓝牙权限。
+两个工具共用 Bleak 3.0.2 与 IOS-Vlink GATT 层，默认按 **`IOS-Vlink` 名称查找**，不含原作者电脑的设备 UUID。附近有多个同名模块时，请显式使用本机地址：`--device 地址`。macOS 的设备 UUID 与其他电脑/ESP32 的地址并不通用。macOS 首次运行需允许终端蓝牙权限。
 
 列出附近 BLE 设备（在自己的电脑执行）：
 
@@ -207,17 +207,7 @@ python3 -m venv .tools/obd-env
 
 默认协议 5、连接上限 60 秒，测试 ECU 声明支持的标准 PID，保留原始响应、逐项耗时与汇总。详见 [CL300 PID 测试说明](diagnostics/CL300-PID测试说明.md)。
 
-### 奔驰 CAN 被动监听
-
-```bash
-.tools/obd-env/bin/python diagnostics/mercedes_can_monitor.py --seconds 60
-```
-
-依次监听 11 位/29 位、500 kbit/s；只发送 ELM 本地配置与监听命令，**不发送 PID/UDS 查询**。按 `1/2/3/4/m` 标记操作时间，`q` 或 Ctrl+C 保存退出。按键仅作标记，不自动解码数值。
-
-生成 `report.md`、`summary.json`、`raw.jsonl`、`frames.csv`、`can_ids.csv`、`markers.csv`。找出候选 ID 后可用 `--filter-id` 硬件接收过滤。接口看不到帧不代表整车没有广播；有帧也不等于已经解码了车速或压力。详见 [奔驰 CAN 监听测试说明](diagnostics/奔驰CAN监听测试说明.md)。
-
-默认日志/报告保存在项目上一级；可通过 `--log`、`--report`、`--output-dir` 指定路径。
+默认日志/报告保存在项目上一级；可通过 `--log`、`--report` 指定路径。
 
 上述工具的日志可能包含 VIN、设备地址与真实响应，请自行保管，分享故障记录前遮盖。仓库不提交车辆原始日志、本机凭证、缓存、虚拟环境和构建目录。
 
@@ -241,7 +231,7 @@ assets/                  Logo原图/转换图与字体许可证
 docs/images/             README精选界面插图
 previews/                本地生成的LVGL预览（不入库）
 firmware/                本地生成的BIN、清单与SHA-256（不入库）
-diagnostics/            电脑BLE/PID/CAN监听工具
+diagnostics/            电脑BLE/PID读取与测试工具
 tests/                  原生UI/控制器与Python模拟测试、报文样本
 tools/                  资源生成、版本清单和打包工具
 ```
@@ -270,9 +260,9 @@ tools/                  资源生成、版本清单和打包工具
 ## 测试与未完成的硬件验收
 
 - 原生测试覆盖模型/计时、XRGB8888 与 RGB565 界面、通用 OBD 控制器，共 4 项。
-- Python 当前共 63 项，覆盖协议 1～9 样本、来源隔离、VIN 重组、断连/取消、CL300 PID、CAN 监听异常，以及名称/地址发现分支。
+- Python 当前共 37 项，覆盖协议 1～9 样本、来源隔离、VIN 重组、断连/取消、CL300 PID，以及名称/地址发现分支。
 - 共同样本与模拟 ECU 测试不等于适配器实际支持全部协议；源码已完成ESP32-S3构建与镜像校验，固件由使用者在本地生成。
-- 当前发布固件尚未完成 C260/CL300 实车回归；50% 实际亮度、物理滑动、镜像触控、USB/电池供电表现仍需硬件验收。新 CAN 监听工具尚未进行车辆监听验证。
+- 当前发布固件尚未完成 C260/CL300 实车回归；50% 实际亮度、物理滑动、镜像触控、USB/电池供电表现仍需硬件验收。
 
 参见 [验证记录](验证记录.md)。测试/构建日志、机器可读运行汇总及性能数据仅在本地保留，不提交 Git。
 
@@ -289,6 +279,14 @@ tools/                  资源生成、版本清单和打包工具
 |首次 `test.sh` 找不到LVGL|先执行 `./build.sh` 安装 `.pio/libdeps` 中的依赖，再测试|
 |修改源码后不能打包|先构建并更新版本清单；不要随意改SHA掩盖未构建的固件代码变化|
 
+## 未来可选性能优化：CAN 被动监听
+
+当前版本采用主动 OBD/PID 轮询，暂时移除被动监听原型、专用测试和运行入口。未来可将CAN被动监听作为**按车型选用**的性能优化项：在具备可靠报文定义的车辆上，评估从广播中读取转速、车速、踏板等高频数据，以减少诊断请求往返和轮询开销。
+
+启用前需核实车辆网关的报文可见性、实际总线/ID格式、信号定义、数据有效期，以及适配器吞吐量。已有IOS-Vlink测试中，全量监听发生过`BUFFER FULL`，单ID过滤可稳定采集，但尚未建立所需信号的可靠解码定义；接收频率不能直接当作仪表刷新收益。
+
+后续可研究现成DBC/车型定义、硬件过滤、自动分组采集与候选信号验证；收益需要在同一车辆和硬件上与轮询方案对比。使用同一个ELM时，持续监听与PID查询不能并发，切换成本和失败后恢复轮询也需验证。该方向仅适用于相应CAN车辆，不适用于CL300当前使用的KWP/K-Line协议，不替代默认通用轮询路径，也不承诺固定性能提升。
+
 ## 引用项目、致谢与许可
 
 |项目/资源|用途与来源|
@@ -302,7 +300,7 @@ tools/                  资源生成、版本清单和打包工具
 |[Bleak](https://github.com/hbldh/bleak)|电脑BLE连接|
 |[Noto CJK](https://github.com/notofonts/noto-cjk)|Noto Sans SC中文子集；[OFL文本](assets/fonts/Noto-OFL.txt)|
 |[Roboto](https://github.com/googlefonts/roboto)|大号数字字体；[随附Apache-2.0文本](assets/fonts/Roboto-APACHE-2.0.txt)|
-|[ELM327官方数据手册](https://www.elmelectronics.com/wp-content/uploads/2017/01/ELM327DS.pdf)|ELM命令、协议编号、监听与过滤语义参考|
+|[ELM327官方数据手册](https://www.elmelectronics.com/wp-content/uploads/2017/01/ELM327DS.pdf)|ELM命令、协议编号与报文格式参考|
 
 项目代码沿用 MIT 许可，各依赖遵循自身许可证。奔驰 Logo 原图由使用者提供，相关图形/商标权利归原权利人，未纳入本项目对软件代码的 MIT 授权，也不代表奔驰或 Waveshare 官方合作/认证。需要替换图标时使用仓库内转换工具。
 

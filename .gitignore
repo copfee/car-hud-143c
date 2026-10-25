@@ -11,7 +11,6 @@ __pycache__/
 *.key
 *_summary.json
 *protocol_cache*.json
-mercedes_can_monitor_*/
 *.zip
 *.zip.sha256
 /firmware/
