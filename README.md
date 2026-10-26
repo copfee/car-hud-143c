@@ -130,34 +130,20 @@ python -m esptool --chip esp32s3 --port COM3 --baud 460800 write_flash --flash_m
 
 固件不会由本仓库工具自动烧录；只有主动执行烧录命令才会写入开发板。
 
-## 从源码构建
+## 构建依赖与测试
 
-需要 Python 3.10+ 和网络；原生测试另外需要 CMake 3.19+、C/C++17 编译器。macOS 可使用 Command Line Tools，Linux 可使用 GCC/Clang，Windows 可使用 Visual Studio 2022 C++ Build Tools。ESP32 工具链由 PlatformIO 下载。
+完成上面的快速构建后，可以运行原生测试和 Python 测试。测试另外需要 CMake 3.19+、C/C++17 编译器；macOS 可使用 Command Line Tools，Linux 可使用 GCC/Clang，Windows 可使用 Visual Studio 2022 C++ Build Tools。ESP32 工具链由 PlatformIO 下载。
 
 macOS / Linux：
 
 ```bash
-# 首次先构建，安装板卡和 LVGL 等依赖
-./build.sh
-
-# 随后执行原生测试和 Python 测试
 ./test.sh
-
-# 校验合并镜像
-./flash.sh --verify-only
 ```
 
 Windows 11 PowerShell：
 
 ```powershell
-# 首次先构建，安装板卡和 LVGL 等依赖
-.\build.ps1
-
-# 安装 CMake 和 Visual Studio C++ Build Tools 后运行原生/Python测试
 .\test.ps1
-
-# 校验合并镜像
-.\flash.ps1 -VerifyOnly
 ```
 
 `build.sh` 与 `build.ps1` 会生成车型静态表、编译 `waveshare_amoled_143c`、合并镜像并更新 SHA-256。两套脚本输出相同的 `firmware/car-hud-143c-full.bin`；`flash.sh` 与 `flash.ps1` 在烧录前都会校验清单。普通构建不需要安装 Node.js、字体转换器或 PNG 解码器，字体和 Logo 的 C 资源已经提交。`tools/reproducible_paths.py` 映射编译路径，避免在固件诊断字符串中写入本机绝对路径。
