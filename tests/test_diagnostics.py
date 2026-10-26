@@ -77,7 +77,9 @@ class Pure(unittest.TestCase):
         caps={};m.add_capabilities(caps,[m.ObdReply(0x7e8,bytes.fromhex('410008180001')),m.ObdReply(0x7e9,bytes.fromhex('410000000000'))])
         self.assertIn(12,caps[0x7e8]['supported']);self.assertNotIn(12,caps[0x7e9]['supported']);self.assertNotIn(47,caps[0x7e8]['known'])
     def test_defaults_and_conflicts(self):
+        self.assertEqual(list(m.PROFILES),['generic','mercedes-c260-2021'])
         a=m.parse_args([]);self.assertEqual((a.profile,a.protocol),('generic','auto'))
+        self.assertEqual(m.parse_args(['--profile','mercedes-c260-2021']).protocol,'auto')
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(m.parse_args(['--brake-pressure']).profile,'mercedes-c260-2021')
         with self.assertRaises(SystemExit),contextlib.redirect_stderr(io.StringIO()):m.parse_args(['--profile','generic','--brake-pressure'])
@@ -104,14 +106,6 @@ class Async(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(c.identity.vin,VIN)
             self.assertFalse(any(x.startswith('22') for x in fake.commands))
             if p<6:self.assertFalse(any(x in fake.commands for x in ['ATCAF1','ATCFC1','ATD0','ATCRA']))
-    async def test_honda_profile_defaults_and_override(self):
-        args=m.parse_args(['--profile','honda-cl300-2023']);self.assertEqual(args.protocol,'5')
-        fake=Fake(5);controller=m.ObdController(fake,args);await controller.initialize()
-        self.assertEqual(controller.protocol,5);self.assertEqual(controller.readings[-1].status,'不支持')
-        self.assertIn('ATTP5',fake.commands);self.assertNotIn('ATSP0',fake.commands)
-        self.assertFalse(any(cmd.startswith(('22','ATSH','ATCRA','ATCAF','ATCFC')) for cmd in fake.commands))
-        self.assertEqual(m.parse_args(['--profile','honda-cl300-2023','--protocol','auto']).protocol,'auto')
-        self.assertEqual(m.parse_args(['--profile','honda-cl300-2023','--protocol','3']).protocol,'3')
     async def test_invalid_cache_is_ignored(self):
         fake=Fake();await m.ProtocolStrategy.discover(fake,cached='corrupt')
         self.assertIn('ATSP0',fake.commands)

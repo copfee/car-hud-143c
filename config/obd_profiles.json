@@ -12,19 +12,6 @@
       "name": "奔驰 C260 2021",
       "pressure": true,
       "default_protocol": 0
-    },
-    {
-      "id": "honda-cl300-2023",
-      "name": "Honda CL300 2023",
-      "pressure": false,
-      "default_protocol": 5,
-      "evidence": {
-        "source": "User screenshot IMG_1463.HEIC, Car Scanner",
-        "protocol": "ISO 14230-4 KWP fast init, 10.4 kbaud",
-        "ecu_name": "ECM -EngineControl",
-        "calibration_id": "0104910E01",
-        "scope": "Protocol shown connected in Car Scanner; HUD firmware and PID support require actual test"
-      }
     }
   ],
   "metrics": [

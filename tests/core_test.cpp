@@ -49,10 +49,22 @@ int main(){
     assert(connectionTimedOut(Mode::Loading,59999,0xFFFFFFFFu));
     assert(!connectionTimedOut(Mode::Loading,60999,1000));
     assert(!connectionTimedOut(Mode::Loading,100,101));
-    assert(ProfileCount==3&&unsigned(VehicleProfile::Mercedes)==1&&unsigned(VehicleProfile::HondaCl300)==2);
-    assert(normalizeProfile(2)==VehicleProfile::HondaCl300&&normalizeProfile(255)==VehicleProfile::Generic);
-    Snapshot selected;selectProfile(selected,VehicleProfile::HondaCl300);assert(selected.requestedProtocol==5&&!profileHasPressure(selected.profile));
-    selected.requestedProtocol=9;assert(selected.requestedProtocol==9);selectProfile(selected,VehicleProfile::Generic);assert(selected.requestedProtocol==0);
+    assert(ProfileCount==2&&unsigned(VehicleProfile::Generic)==0&&unsigned(VehicleProfile::Mercedes)==1);
+    assert(normalizeProfile(2)==VehicleProfile::Generic&&normalizeProfile(255)==VehicleProfile::Generic);
+    Snapshot selected;
+    for(unsigned profile=0;profile<ProfileCount;++profile){
+        for(unsigned protocol=0;protocol<=9;++protocol){
+            restoreProfileSettings(selected,profile,protocol);
+            assert(unsigned(selected.profile)==profile&&selected.requestedProtocol==protocol);
+        }
+        restoreProfileSettings(selected,profile,255);assert(selected.requestedProtocol==defaultProtocol(selected.profile));
+    }
+    for(unsigned profile:{ProfileCount,255u}){
+        restoreProfileSettings(selected,profile,5);
+        assert(selected.profile==VehicleProfile::Generic&&selected.requestedProtocol==0&&!profileHasPressure(selected.profile));
+    }
+    selected.requestedProtocol=9;selectProfile(selected,VehicleProfile::Mercedes);assert(selected.requestedProtocol==0&&profileHasPressure(selected.profile));
+    selected.requestedProtocol=5;selectProfile(selected,VehicleProfile::Generic);assert(selected.requestedProtocol==0&&!profileHasPressure(selected.profile));
     double v=0;
     auto r=parseReplies("18DAF11004410C0B88000000\r\n18DAF11803410D4400000000\r>");
     assert(r.size()==2);assert(decode(r[0],Rpm,0x0C,v)&&v==738);assert(decode(r[1],Speed,0x0D,v)&&v==68);
@@ -108,8 +120,7 @@ int main(){
     }
     assert(idle&&moving&&braking&&distance>=40000&&distance<130010&&a.demo);
     assert(a.battery.volts==battery.volts&&a.battery.stamp==battery.stamp&&a.system.freeHeap==123456);
-    Snapshot generic;demo.tick(generic,100,0.1);assert(!generic.samples[Pressure].valid);
-    Snapshot honda;selectProfile(honda,VehicleProfile::HondaCl300);demo.tick(honda,100,0.1);assert(!honda.samples[Pressure].valid&&honda.capabilities.status[Pressure]==MetricStatus::Unsupported);
+    Snapshot generic;demo.tick(generic,100,0.1);assert(!generic.samples[Pressure].valid&&generic.capabilities.status[Pressure]==MetricStatus::Unsupported);
     invalidate(a);for(auto& x:a.samples)assert(!x.valid);
     std::cout<<"PASS: universal brightness, timing, model, CAN/ISO-TP, PID/odometer, source validation, smoothing/staleness, 1800 coherent demo samples\n";
 }

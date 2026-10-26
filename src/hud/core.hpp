@@ -23,7 +23,7 @@ public:
     bool takeCompletion(uint32_t now);
 };
 enum class Action : uint8_t { None, Retry, Demo, Brightness, Mirror, Profile, Protocol, Identity, Bluetooth, ScanBluetooth, SelectBluetooth, CancelBluetooth };
-enum class VehicleProfile : uint8_t { Generic, Mercedes, HondaCl300, Count };
+enum class VehicleProfile : uint8_t { Generic=0, Mercedes=1, Count };
 static_assert(unsigned(VehicleProfile::Count)==ProfileCount,"Profile definitions must match stable persisted IDs");
 inline VehicleProfile normalizeProfile(unsigned value){return value<ProfileCount?VehicleProfile(value):VehicleProfile::Generic;}
 inline uint8_t defaultProtocol(VehicleProfile profile){return ProfileDefaultProtocols[unsigned(normalizeProfile(unsigned(profile)))];}
@@ -107,6 +107,10 @@ struct Snapshot {
     BluetoothInfo bluetooth;
 };
 inline void selectProfile(Snapshot& s,VehicleProfile profile){s.profile=normalizeProfile(unsigned(profile));s.requestedProtocol=defaultProtocol(s.profile);}
+inline void restoreProfileSettings(Snapshot& s,unsigned profile,unsigned protocol){
+    selectProfile(s,normalizeProfile(profile));
+    if(profile<ProfileCount&&protocol<=9)s.requestedProtocol=uint8_t(protocol);
+}
 uint32_t period(Metric m, PageId page);
 uint32_t pressureBurstPeriod(PageId page);
 unsigned pressureBurstReads(PageId page);

@@ -54,7 +54,7 @@ else:
                                'hardware_acceptance_pending':True},
         'verification':{'protocol_1_to_9':'synthetic parser and fake ECU tests',
                         'mercedes_standard_7_pressure_6':'historical captures, current firmware requires vehicle regression',
-                        'honda_cl300_2023':'user screenshot confirms protocol 5 in Car Scanner; current firmware/PID test pending','current_release_vehicle_tested':False},
+                        'current_release_vehicle_tested':False},
         'hardware_tested':False,'images':{},'source_sha256':{}
     }
     for path in sorted(FOLDER.glob('*.bin')):data['images'][path.name]={'bytes':path.stat().st_size,'sha256':digest(path)}

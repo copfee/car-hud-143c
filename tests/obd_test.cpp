@@ -37,8 +37,7 @@ struct Fake:ElmChannel{
             else if(cmd=="0900")data={0x49,0,0x40,0,0,0};
             else if(cmd=="0902"){data={0x49,2,1};std::string vin="1D4GP00R55B123456";data.insert(data.end(),vin.begin(),vin.end());}
             else {answer="NO DATA\r";return true;}
-            if(headers&&protocol==5){std::vector<uint8_t> raw{uint8_t(0xC0|data.size()),0xF1,0x10};raw.insert(raw.end(),data.begin(),data.end());uint8_t sum=0;for(auto v:raw)sum+=v;raw.push_back(sum);answer.clear();for(auto v:raw)answer+=hexByte(v);answer+='\r';}
-            else if(headers)answer=frame(0x18DAF110,data);else{answer.clear();for(auto b:data)answer+=hexByte(b);answer+='\r';}
+            if(headers)answer=frame(0x18DAF110,data);else{answer.clear();for(auto b:data)answer+=hexByte(b);answer+='\r';}
         }return true;
     }
 };
@@ -63,9 +62,6 @@ int main(int argc,char** argv){
     auto before=s.connection.lastReply;f.sleep=true;f.clock+=16000;assert(c.cycle(s));assert(s.connection.state==ConnectionState::WaitingEcu&&!s.connection.ecu);
     assert(s.connection.lastReply==before);f.clock+=5000;assert(c.cycle(s));f.clock+=5000;assert(!c.cycle(s));
     Fake forced;Snapshot fixed;fixed.requestedProtocol=6;ObdController bad(forced);assert(!bad.initialize(fixed));assert(std::find(forced.commands.begin(),forced.commands.end(),"ATSP0")==forced.commands.end());
-    Fake honda;honda.vehicleProtocol=5;Snapshot hs;selectProfile(hs,VehicleProfile::HondaCl300);ObdController hc(honda);assert(hc.initialize(hs));assert(hs.connection.info.detected==5&&hs.mode==Mode::Live&&hs.samples[Speed].raw==0);assert(hc.cycle(hs)&&hs.samples[Rpm].raw==738);
-    assert(hs.capabilities.status[Pressure]==MetricStatus::Unsupported);assert(std::find(honda.commands.begin(),honda.commands.end(),"ATTP5")!=honda.commands.end());
-    for(auto& cmd:honda.commands)assert(cmd!="ATSP0"&&cmd.rfind("22",0)!=0&&cmd.rfind("ATCRA",0)!=0&&cmd.rfind("ATCAF",0)!=0&&cmd.rfind("ATCFC",0)!=0&&cmd.rfind("ATSH",0)!=0);
     Fake mercedes;mercedes.pressureReplies=true;Snapshot ms;ms.profile=VehicleProfile::Mercedes;ms.page=PageId::Pedals;ObdController mc(mercedes);assert(mc.initialize(ms));
     for(unsigned i=0;i<120;++i){mercedes.clock+=100;assert(mc.cycle(ms));}
     assert(ms.samples[Pressure].valid&&ms.samples[Pressure].raw>25&&ms.samples[Pressure].raw<26);

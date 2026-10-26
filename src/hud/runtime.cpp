@@ -227,8 +227,7 @@ void setup(){
     if(!stateMutex||!preferencesMutex||!packets)abort();
     if(!board.begin()){if(Serial)Serial.println("Display initialization failed");while(true)delay(100);}
     prefs.begin("c260-hud",false);shared.brightness=std::max(10,std::min(100,prefs.getInt("brightness",50)));shared.mirror=prefs.getBool("mirror",false);
-    shared.profile=prefs.getUChar("schema",0)>=1?normalizeProfile(prefs.getUChar("profile",0)):VehicleProfile::Generic;
-    shared.requestedProtocol=prefs.getUChar("schema",0)>=1?(prefs.getUChar("protocol",defaultProtocol(shared.profile))<=9?prefs.getUChar("protocol",defaultProtocol(shared.profile)):defaultProtocol(shared.profile)):0;
+    if(prefs.getUChar("schema",0)>=1)restoreProfileSettings(shared,prefs.getUChar("profile",0),prefs.getUChar("protocol",255));
     shared.bluetooth.saved=decodePeer(prefs.getString("ble_peer","").c_str());shared.bluetooth.target=shared.bluetooth.saved;
     if(validPeer(shared.bluetooth.saved))shared.bluetooth.detail="已保存 / 下次开机自动连接";
     board.setBrightness(effectiveBrightness(Mode::Splash,shared.brightness));board.setMirror(shared.mirror);ui.create();
