@@ -28,6 +28,41 @@ static void rule(lv_obj_t* p,int x,int y,int w) {
     auto* o=lv_obj_create(p);lv_obj_remove_style_all(o);lv_obj_set_pos(o,x,y);lv_obj_set_size(o,w,1);
     lv_obj_set_style_bg_color(o,lv_color_hex(Track),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);
 }
+template<size_t N>
+static void iconStroke(lv_obj_t* parent,const lv_point_precise_t (&points)[N],uint32_t color){
+    auto* line=lv_line_create(parent);lv_line_set_points(line,points,N);
+    lv_obj_set_style_line_color(line,lv_color_hex(color),0);lv_obj_set_style_line_width(line,2,0);
+    lv_obj_set_style_line_rounded(line,true,0);
+    lv_obj_remove_flag(line,lv_obj_flag_t(LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE));
+}
+static lv_obj_t* gaugeReadout(lv_obj_t* parent,Metric metric,int x,uint32_t color){
+    auto* row=lv_obj_create(parent);lv_obj_remove_style_all(row);lv_obj_set_pos(row,x,303);lv_obj_set_size(row,168,58);
+    lv_obj_set_flex_flow(row,LV_FLEX_FLOW_ROW);lv_obj_set_flex_align(row,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row,8,0);lv_obj_remove_flag(row,lv_obj_flag_t(LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE));
+    auto* icon=lv_obj_create(row);lv_obj_remove_style_all(icon);lv_obj_set_size(icon,28,34);
+    lv_obj_remove_flag(icon,lv_obj_flag_t(LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE));
+    // LVGL retains the point arrays, so each stroke has static storage.
+    if(metric==Coolant){
+        static const lv_point_precise_t thermometer[]={{10,4},{10,16},{7,19},{7,23},{10,26},{14,26},{17,23},{17,19},{14,16},{14,4},{12,2},{10,4}};
+        static const lv_point_precise_t mercury[]={{12,9},{12,22}};
+        static const lv_point_precise_t upperTick[]={{18,7},{22,7}};
+        static const lv_point_precise_t lowerTick[]={{18,12},{22,12}};
+        static const lv_point_precise_t upperWave[]={{2,28},{5,27},{9,29},{13,27},{17,29},{21,27},{25,28}};
+        static const lv_point_precise_t lowerWave[]={{2,32},{5,31},{9,33},{13,31},{17,33},{21,31},{25,32}};
+        iconStroke(icon,thermometer,color);iconStroke(icon,mercury,color);
+        iconStroke(icon,upperTick,color);iconStroke(icon,lowerTick,color);
+        iconStroke(icon,upperWave,color);iconStroke(icon,lowerWave,color);
+    }else{
+        static const lv_point_precise_t body[]={{3,30},{3,5},{5,3},{17,3},{19,5},{19,30},{3,30}};
+        static const lv_point_precise_t window[]={{6,7},{16,7},{16,15},{6,15},{6,7}};
+        static const lv_point_precise_t base[]={{1,31},{21,31}};
+        static const lv_point_precise_t hose[]={{19,18},{22,18},{22,27},{24,29},{26,27},{26,12},{21,7}};
+        static const lv_point_precise_t nozzle[]={{23,9},{22,12},{26,15}};
+        iconStroke(icon,body,color);iconStroke(icon,window,color);iconStroke(icon,base,color);
+        iconStroke(icon,hose,color);iconStroke(icon,nozzle,color);
+    }
+    return label(row,"--",0,0,LV_SIZE_CONTENT,&lv_font_montserrat_32,color);
+}
 static lv_obj_t* bar(lv_obj_t* p,int x,int y,int w,int h,uint32_t color) {
     auto* o=lv_bar_create(p);lv_obj_set_pos(o,x,y);lv_obj_set_size(o,w,h);lv_bar_set_range(o,0,1000);
     lv_obj_set_style_bg_color(o,lv_color_hex(Track),LV_PART_MAIN);lv_obj_set_style_bg_opa(o,255,LV_PART_MAIN);
@@ -97,7 +132,7 @@ void Interface::create() {
         pages_[p]=lv_tileview_add_tile(tiles_,p,0,dir);
         plain(pages_[p]);lv_obj_set_pos(pages_[p],466*p,0);
         lv_obj_add_flag(pages_[p],LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
-        demoBadge_[p]=label(pages_[p],"演示",180,p==0?100:p==1?66:59,106,&hud_cn_18,Amber);
+        demoBadge_[p]=label(pages_[p],"演示",180,p==0?94:p==1?66:59,106,&hud_cn_18,Amber);
         for(unsigned j=0;j<PageCount;++j) {
             dots_[p][j]=lv_obj_create(pages_[p]);lv_obj_remove_style_all(dots_[p][j]);lv_obj_set_size(dots_[p][j],10,10);
             lv_obj_set_pos(dots_[p][j],208+j*20,433);lv_obj_set_style_radius(dots_[p][j],5,0);lv_obj_set_style_bg_opa(dots_[p][j],255,0);
@@ -105,34 +140,39 @@ void Interface::create() {
         }
     }
     auto* home=pages_[0];
-    gauge_=lv_arc_create(home);lv_obj_set_pos(gauge_,26,26);lv_obj_set_size(gauge_,414,414);
-    lv_arc_set_rotation(gauge_,0);lv_arc_set_bg_angles(gauge_,180,360);lv_arc_set_range(gauge_,0,8000);
-    lv_obj_set_style_arc_width(gauge_,6,LV_PART_MAIN);lv_obj_set_style_arc_width(gauge_,6,LV_PART_INDICATOR);
+    constexpr int gaugeInset=2,gaugeDiameter=466-2*gaugeInset,gaugeRadius=gaugeDiameter/2;
+    auto createGaugeArc=[home](){
+        auto* arc=lv_arc_create(home);lv_obj_set_pos(arc,gaugeInset,gaugeInset);lv_obj_set_size(arc,gaugeDiameter,gaugeDiameter);
+        lv_arc_set_rotation(arc,0);lv_obj_set_style_pad_all(arc,0,LV_PART_MAIN);lv_obj_set_style_pad_all(arc,0,LV_PART_INDICATOR);
+        lv_obj_set_style_arc_width(arc,6,LV_PART_MAIN);lv_obj_set_style_arc_width(arc,6,LV_PART_INDICATOR);
+        lv_obj_set_style_bg_opa(arc,0,LV_PART_KNOB);lv_obj_set_style_pad_all(arc,0,LV_PART_KNOB);lv_obj_remove_flag(arc,LV_OBJ_FLAG_CLICKABLE);
+        return arc;
+    };
+    gauge_=createGaugeArc();lv_arc_set_bg_angles(gauge_,180,360);lv_arc_set_range(gauge_,0,8000);
     lv_obj_set_style_arc_color(gauge_,lv_color_hex(Track),LV_PART_MAIN);lv_obj_set_style_arc_color(gauge_,lv_color_hex(Cyan),LV_PART_INDICATOR);
-    lv_obj_set_style_bg_opa(gauge_,0,LV_PART_KNOB);lv_obj_set_style_pad_all(gauge_,0,LV_PART_KNOB);lv_obj_remove_flag(gauge_,LV_OBJ_FLAG_CLICKABLE);
-    auto* red=lv_arc_create(home);lv_obj_set_pos(red,26,26);lv_obj_set_size(red,414,414);lv_arc_set_rotation(red,0);
+    auto* red=createGaugeArc();
     lv_arc_set_bg_angles(red,326,360);lv_obj_set_style_arc_color(red,lv_color_hex(0xF45164),LV_PART_MAIN);
-    lv_obj_set_style_arc_width(red,6,LV_PART_MAIN);lv_obj_set_style_arc_opa(red,0,LV_PART_INDICATOR);lv_obj_set_style_bg_opa(red,0,LV_PART_KNOB);lv_obj_remove_flag(red,LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_arc_opa(red,0,LV_PART_INDICATOR);
     static lv_point_precise_t tickPoints[33][2];
     for(int i=0;i<33;++i){
         double a=(180+i*180.0/32)*3.14159265/180;
-        int inner=i%8==0?192:199;
+        int inner=gaugeRadius-(i%8==0?15:8);
         tickPoints[i][0]={int32_t(std::lround(233+inner*std::cos(a))),int32_t(std::lround(233+inner*std::sin(a)))};
-        tickPoints[i][1]={int32_t(std::lround(233+207*std::cos(a))),int32_t(std::lround(233+207*std::sin(a)))};
+        tickPoints[i][1]={int32_t(std::lround(233+gaugeRadius*std::cos(a))),int32_t(std::lround(233+gaugeRadius*std::sin(a)))};
         auto* line=lv_line_create(home);lv_line_set_points(line,tickPoints[i],2);lv_obj_set_style_line_color(line,lv_color_hex(Muted),0);lv_obj_set_style_line_width(line,i%8==0?2:1,0);
     }
     for(int i=0;i<5;++i) {
         double a=(180+i*45)*3.14159265/180;char text[4];snprintf(text,sizeof(text),"%d",i*2);
-        label(home,text,int(233+173*std::cos(a))-16,int(233+173*std::sin(a))-10,32,&lv_font_montserrat_18);
+        label(home,text,int(233+(gaugeRadius-34)*std::cos(a))-16,int(233+(gaugeRadius-34)*std::sin(a))-10,32,&lv_font_montserrat_18);
     }
-    label(home,"x1000 rpm",150,76,166,&lv_font_montserrat_16,Muted);
+    label(home,"x1000 rpm",150,60,166,&lv_font_montserrat_16,Muted);
     number_[Speed]=label(home,"--",30,122,406,&hud_speed_96);
-    label(home,"km/h",160,220,146,&lv_font_montserrat_22,Muted);
+    auto* speedUnit=label(home,"km/h",160,0,146,&lv_font_montserrat_22,Muted);
+    lv_obj_align_to(speedUnit,number_[Speed],LV_ALIGN_OUT_BOTTOM_MID,0,6);
     number_[Rpm]=label(home,"--",70,250,326,&lv_font_montserrat_32);
     rule(home,78,294,310);rule(home,90,365,286);
-    label(home,"水温",90,305,130,&hud_cn_18,Muted);label(home,"油量",246,305,130,&hud_cn_18,Muted);
-    number_[Coolant]=label(home,"--",72,328,166,&lv_font_montserrat_24,Amber);
-    number_[Fuel]=label(home,"--",228,328,166,&lv_font_montserrat_24,Cyan);
+    number_[Coolant]=gaugeReadout(home,Coolant,65,Amber);
+    number_[Fuel]=gaugeReadout(home,Fuel,233,Cyan);
     label(home,"总里程",150,374,166,&hud_cn_18,Muted);
     number_[Odometer]=label(home,"--",65,398,336,&lv_font_montserrat_22);
     auto* detail=pages_[1];label(detail,"踏板与制动",110,34,246,&hud_cn_18);
