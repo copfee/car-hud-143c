@@ -63,7 +63,7 @@ void Interface::scrollEvent(lv_event_t* e){
     if(target==self->tiles_)self->scrolling_=started;
     else if(target==self->settingsScroll_)self->settingsScrolling_=started;
     else return;
-    if(!started){self->lastNumbers_=0;self->lastInfo_=0;}
+    if(!started){self->lastNumbers_=0;self->lastDynamics_=0;self->lastInfo_=0;}
 }
 void Interface::create() {
     splash_=lv_obj_create(nullptr);plain(splash_);
@@ -358,12 +358,17 @@ void Interface::refresh(const Snapshot& s,uint32_t now,uint32_t sinceAttempt) {
         return;
     }
     auto value=[&](Metric m){return s.samples[m].valid?s.samples[m].shown:0;};
-    if(active==0)lv_arc_set_value(gauge_,int(value(Rpm)));
-    else {
-        lv_bar_set_value(pedalBar_,int(value(Pedal)*10),LV_ANIM_OFF);lv_bar_set_value(throttleBar_,int(value(Throttle)*10),LV_ANIM_OFF);
-        lv_bar_set_value(brakeBar_,int(std::max(0.0,std::min(100.0,value(Pressure)))*10),LV_ANIM_OFF);
+    // Non-numeric dynamics use the 30 Hz full-frame path.  Numeric labels are
+    // allowed to invalidate independently on every 60 Hz UI tick below.
+    if(pageChanged||!lastDynamics_||uint32_t(now-lastDynamics_)>=33){
+        if(active==0)lv_arc_set_value(gauge_,int(value(Rpm)));
+        else {
+            lv_bar_set_value(pedalBar_,int(value(Pedal)*10),LV_ANIM_OFF);lv_bar_set_value(throttleBar_,int(value(Throttle)*10),LV_ANIM_OFF);
+            lv_bar_set_value(brakeBar_,int(std::max(0.0,std::min(100.0,value(Pressure)))*10),LV_ANIM_OFF);
+        }
+        lastDynamics_=now;
     }
-    if(!pageChanged&&uint32_t(now-lastNumbers_)<100)return;lastNumbers_=now;
+    if(!pageChanged&&uint32_t(now-lastNumbers_)<16)return;lastNumbers_=now;
     char b[64];
     if(active==0){
         for(auto m:{Speed,Rpm,Coolant,Fuel,Odometer}){fmt(b,sizeof(b),m,s.samples[m]);setText(number_[m],b);}

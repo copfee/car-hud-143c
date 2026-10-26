@@ -1,87 +1,163 @@
 #pragma once
 #include "core.hpp"
+#include "display_policy.hpp"
+#include "display_transport.hpp"
 #include <Arduino.h>
-#include <Arduino_GFX_Library.h>
 #include <TouchDrvCSTXXX.hpp>
+#include <algorithm>
+#include <cstring>
+#include <esp_heap_caps.h>
+#include <freertos/semphr.h>
 #include <lvgl.h>
+
 namespace hud {
-// Board-specific initialization from Waveshare's 1.43C reference BSP.
-// Keep this adapter separate from the upstream display library.
-class Panel final : public Arduino_CO5300 {
-    Arduino_DataBus* bus_;
-protected:
-    void tftInit() override {
-        pinMode(13,OUTPUT);digitalWrite(13,HIGH);delay(10);digitalWrite(13,LOW);delay(10);digitalWrite(13,HIGH);delay(120);
-        bus_->beginWrite();
-        bus_->writeC8D8(0xFE,0x00);bus_->writeC8D8(0xC4,0x80);bus_->writeC8D8(0x3A,0x55);
-        bus_->writeC8D8(0x35,0x00);bus_->writeC8D8(0x53,0x20);bus_->writeC8D8(0x51,0x00);
-        bus_->writeC8D8(0x36,0xC0);bus_->writeC8D8(0x63,0xFF);
-        bus_->writeC8D16D16(0x2A,0x0006,0x01D7);bus_->writeC8D16D16(0x2B,0,0x01D1);
-        bus_->endWrite();bus_->sendCommand(0x11);delay(100);bus_->sendCommand(0x29);
-    }
-public:
-    explicit Panel(Arduino_DataBus* bus):Arduino_CO5300(bus,13,0,false,466,466,8,0,0,0),bus_(bus){}
-};
+
 class Board {
-    Arduino_ESP32QSPI bus_{15,14,9,10,11,12};
-    Panel panel_{&bus_};
+    static constexpr unsigned Width=466,Height=466;
+    static constexpr size_t FrameBytes=size_t(Width)*Height*2;
+    DisplayTransport transport_;
     TouchDrvCSTXXX touch_;
-    bool mirror_=false;
-    bool touchReady_=false;
-    uint64_t flushUs_=0;
-    uint32_t flushes_=0,frames_=0,maxHandlerUs_=0,statsAt_=0;
+    lv_display_t* display_=nullptr;
+    SemaphoreHandle_t teSignal_=nullptr;
+    DirtyRegions dirty_;
+    uint8_t* frame_=nullptr;
+    bool mirror_=false,touchReady_=false,direct_=false,teReady_=false,pendingFlush_=false;
+    int numericPage_=-1;
+    volatile uint32_t teCount_=0;
+    uint32_t lastFullTe_=0,lastFullMs_=0,consecutiveTeTimeouts_=0;
+    uint64_t transferBytes_=0,transferUs_=0,teWaitUs_=0;
+    uint32_t regions_=0,fullFrames_=0,numericFrames_=0,teTimeouts_=0,maxHandlerUs_=0,statsAt_=0;
+    uint32_t pendingStartedUs_=0,pendingBytes_=0;
+
     static Board* instance_;
-    static void flush(lv_display_t* d,const lv_area_t* a,uint8_t* p) {
-        uint32_t started=micros();
-        instance_->panel_.draw16bitBeRGBBitmap(a->x1,a->y1,reinterpret_cast<uint16_t*>(p),lv_area_get_width(a),lv_area_get_height(a));
-        instance_->flushUs_+=uint32_t(micros()-started);++instance_->flushes_;
-        if(lv_display_flush_is_last(d))++instance_->frames_;
-        // Arduino_GFX QSPI transfer is synchronous; the buffer is reusable on return.
-        lv_display_flush_ready(d);
+    static void teInterrupt(){
+        if(!instance_)return;
+        ++instance_->teCount_;BaseType_t wake=pdFALSE;
+        if(instance_->teSignal_)xSemaphoreGiveFromISR(instance_->teSignal_,&wake);
+        if(wake)portYIELD_FROM_ISR();
     }
-    static void read(lv_indev_t*,lv_indev_data_t* d) {
+    static DisplayRect rect(const lv_area_t* area){return {int16_t(area->x1),int16_t(area->y1),int16_t(area->x2),int16_t(area->y2)};}
+    static void alignArea(lv_event_t* event){
+        auto* area=lv_event_get_invalidated_area(event);auto adjusted=aligned(rect(area));
+        if(instance_->direct_&&!numericOnly(adjusted,instance_->numericPage_))adjusted=FullDisplay;
+        area->x1=adjusted.x1;area->y1=adjusted.y1;area->x2=adjusted.x2;area->y2=adjusted.y2;
+    }
+    static void flush(lv_display_t* display,const lv_area_t* area,uint8_t* pixels){instance_->flushArea(display,area,pixels);}
+    static void flushWait(lv_display_t*){instance_->waitDisplayIdle();}
+    static void read(lv_indev_t*,lv_indev_data_t* data){
         int16_t x=0,y=0;
-        if(instance_->touchReady_ && instance_->touch_.getPoint(&x,&y,1)) {
-            int tx=465-x,ty=465-y;
-            if(instance_->mirror_)tx=465-tx;
-            d->point.x=constrain(tx,0,465);d->point.y=constrain(ty,0,465);d->state=LV_INDEV_STATE_PRESSED;
-        }else d->state=LV_INDEV_STATE_RELEASED;
+        if(instance_->touchReady_&&instance_->touch_.getPoint(&x,&y,1)){
+            int tx=465-x,ty=465-y;if(instance_->mirror_)tx=465-tx;
+            data->point.x=constrain(tx,0,465);data->point.y=constrain(ty,0,465);data->state=LV_INDEV_STATE_PRESSED;
+        }else data->state=LV_INDEV_STATE_RELEASED;
     }
-    static void alignArea(lv_event_t* e) {
-        auto* a=lv_event_get_invalidated_area(e);
-        a->x1&=~1;a->y1&=~1;a->x2=std::min(465,int(a->x2|1));a->y2=std::min(465,int(a->y2|1));
+    bool waitForTearing(bool full){
+        if(!teReady_){
+            if(full){uint32_t elapsed=millis()-lastFullMs_;if(elapsed<33)delay(33-elapsed);lastFullMs_=millis();}
+            return false;
+        }
+        uint32_t started=micros(),current=teCount_,target=current+1;
+        if(full&&int32_t(lastFullTe_+2-target)>0)target=lastFullTe_+2;
+        while(int32_t(teCount_-target)<0){
+            while(xSemaphoreTake(teSignal_,0)==pdTRUE){}
+            if(int32_t(teCount_-target)>=0)break;
+            if(xSemaphoreTake(teSignal_,pdMS_TO_TICKS(22))!=pdTRUE){
+                ++teTimeouts_;++consecutiveTeTimeouts_;teWaitUs_+=uint32_t(micros()-started);
+                if(consecutiveTeTimeouts_>=3)teReady_=false;
+                return false;
+            }
+        }
+        consecutiveTeTimeouts_=0;if(full){lastFullTe_=teCount_;lastFullMs_=millis();}
+        teWaitUs_+=uint32_t(micros()-started);return true;
+    }
+    static uint32_t areaBytes(const DisplayRect& area){return uint32_t(area.x2-area.x1+1)*uint32_t(area.y2-area.y1+1)*2;}
+    void finishPending(){
+        if(!pendingFlush_)return;
+        transport_.wait();transferUs_+=uint32_t(micros()-pendingStartedUs_);transferBytes_+=pendingBytes_;
+        pendingBytes_=0;pendingFlush_=false;if(display_)lv_display_flush_ready(display_);
+    }
+    void flushArea(lv_display_t* display,const lv_area_t* area,uint8_t* pixels){
+        if(!direct_){
+            auto region=rect(area);uint32_t started=micros();
+            bool ok=transport_.startPixels(pixels,unsigned(area->x2-area->x1+1),area->x1,area->y1,region)&&transport_.wait();
+            transferUs_+=uint32_t(micros()-started);transferBytes_+=areaBytes(region);++regions_;
+            if(!ok&&Serial)Serial.println("[HUD-DISPLAY] fallback transfer failed");
+            lv_display_flush_ready(display);return;
+        }
+        dirty_.add(rect(area),numericPage_);frame_=pixels;
+        if(!lv_display_flush_is_last(display)){lv_display_flush_ready(display);return;}
+        pendingBytes_=0;bool ok=true;
+        if(dirty_.full()){
+            waitForTearing(true);pendingStartedUs_=micros();pendingBytes_=areaBytes(FullDisplay);++regions_;++fullFrames_;
+            ok=transport_.startPixels(frame_,Width,0,0,FullDisplay);
+        }else if(dirty_.count()){
+            waitForTearing(false);pendingStartedUs_=micros();++numericFrames_;
+            for(size_t i=0;i<dirty_.count()&&ok;++i){
+                const auto& region=dirty_[i];pendingBytes_+=areaBytes(region);++regions_;
+                ok=transport_.startPixels(frame_,Width,0,0,region);
+                if(i+1<dirty_.count())ok=transport_.wait();
+            }
+        }
+        dirty_.clear();
+        if(!ok||!pendingBytes_){
+            transport_.wait();if(!ok&&Serial)Serial.println("[HUD-DISPLAY] DMA transfer failed");
+            lv_display_flush_ready(display);return;
+        }
+        display_=display;pendingFlush_=true;
     }
 public:
-    bool begin() {
+    bool begin(){
         instance_=this;
-        if(!panel_.begin(40000000))return false;
-        setMirror(false);panel_.setBrightness(0);panel_.fillScreen(0);setBrightness(SplashBrightnessPercent);
+        if(!transport_.begin(80000000)||!transport_.initializePanel())return false;
+        teSignal_=xSemaphoreCreateBinary();if(!teSignal_)return false;
+        pinMode(8,INPUT);attachInterrupt(digitalPinToInterrupt(8),teInterrupt,RISING);delay(55);
+        teReady_=teCount_>=2;lastFullTe_=teCount_;lastFullMs_=millis();
+        void* first=nullptr;void* second=nullptr;
+        if(psramFound()){
+            first=heap_caps_aligned_alloc(64,FrameBytes,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+            second=heap_caps_aligned_alloc(64,FrameBytes,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+        }
+        direct_=first&&second&&teReady_;
+        if(!direct_){
+            if(first)heap_caps_free(first);if(second)heap_caps_free(second);
+            if(!transport_.setFrequency(40000000))return false;constexpr size_t fallbackBytes=Width*16*2;
+            first=heap_caps_aligned_alloc(16,fallbackBytes,MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
+            second=heap_caps_aligned_alloc(16,fallbackBytes,MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
+            if(!first||!second)return false;
+        }
+        size_t bufferBytes=direct_?FrameBytes:Width*16*2;
+        std::memset(first,0,bufferBytes);std::memset(second,0,bufferBytes);
+        if(!transport_.startSolid(0,FullDisplay)||!transport_.wait())return false;
+        writeBrightness(0);setMirror(false);writeBrightness(SplashBrightnessPercent);
         touch_.setPins(16,17);touchReady_=touch_.begin(Wire,0x15,47,48);Wire.setClock(400000);
         analogReadResolution(12);analogSetPinAttenuation(4,ADC_11db);pinMode(7,INPUT_PULLUP);
         lv_init();lv_tick_set_cb([]()->uint32_t{return millis();});
-        auto* display=lv_display_create(466,466);lv_display_set_color_format(display,LV_COLOR_FORMAT_RGB565_SWAPPED);
-        constexpr size_t size=466*32*2;
-        auto* a=heap_caps_malloc(size,MALLOC_CAP_DMA|MALLOC_CAP_INTERNAL);
-        auto* b=heap_caps_malloc(size,MALLOC_CAP_DMA|MALLOC_CAP_INTERNAL);
-        if(!a||!b)return false;
-        lv_display_set_buffers(display,a,b,size,LV_DISPLAY_RENDER_MODE_PARTIAL);lv_display_set_flush_cb(display,flush);
-        lv_display_add_event_cb(display,alignArea,LV_EVENT_INVALIDATE_AREA,nullptr);
+        display_=lv_display_create(Width,Height);lv_display_set_color_format(display_,LV_COLOR_FORMAT_RGB565_SWAPPED);
+        lv_display_set_buffers(display_,first,second,bufferBytes,direct_?LV_DISPLAY_RENDER_MODE_DIRECT:LV_DISPLAY_RENDER_MODE_PARTIAL);
+        if(!direct_)lv_timer_set_period(lv_display_get_refr_timer(display_),33);
+        lv_display_set_flush_cb(display_,flush);lv_display_set_flush_wait_cb(display_,flushWait);
+        lv_display_add_event_cb(display_,alignArea,LV_EVENT_INVALIDATE_AREA,nullptr);
         auto* input=lv_indev_create();lv_indev_set_type(input,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(input,read);
-        lv_timer_set_period(lv_indev_get_read_timer(input),10);
+        lv_timer_set_period(lv_indev_get_read_timer(input),10);statsAt_=millis();
+        if(Serial)Serial.printf("[HUD-DISPLAY] mode=%s qspi_mhz=%u te_edges=%u buffers=%u\n",direct_?"direct-psram":"partial-fallback",direct_?80u:40u,unsigned(teCount_),unsigned(bufferBytes));
         return true;
     }
-    void setBrightness(int pct){panel_.setBrightness(constrain(pct,10,100)*255/100);}
-    // GPIO4 / ADC1_CH3, equal-value divider; GPIO7 is active-low charger STAT.
-    // Only the telemetry task uses ADC. No ADC conversions in LVGL callbacks.
+    void waitDisplayIdle(){finishPending();transport_.wait();}
+    void writeBrightness(int pct){waitDisplayIdle();transport_.writeRegister(0x51,uint8_t(constrain(pct,0,100)*255/100));}
+    void setBrightness(int pct){writeBrightness(constrain(pct,10,100));}
     double readBatteryVoltage(){uint32_t mv=0;for(unsigned i=0;i<8;++i)mv+=analogReadMilliVolts(4);return double(mv)*2/(8*1000);}
-    bool batteryCharging() const{return digitalRead(7)==LOW;}
-    void setMirror(bool enabled){mirror_=enabled;bus_.beginWrite();bus_.writeC8D8(CO5300_W_MADCTL,uint8_t(0xC0^(enabled?0x40:0)));bus_.endWrite();}
+    bool batteryCharging()const{return digitalRead(7)==LOW;}
+    void setMirror(bool enabled){waitDisplayIdle();mirror_=enabled;transport_.writeRegister(0x36,uint8_t(0xC0^(enabled?0x40:0)));}
+    bool directMode()const{return direct_;}
+    void setNumericPage(int page){numericPage_=page==0||page==1?page:-1;}
     void profileHandler(uint32_t elapsedUs){
-        maxHandlerUs_=std::max(maxHandlerUs_,elapsedUs);uint32_t now=millis(),elapsed=now-statsAt_;
-        if(elapsed<5000)return;
-        if(Serial&&Serial.availableForWrite()>=192)Serial.printf("[HUD-PERF] refresh_hz=%.1f flushes=%u transfer_ms=%.1f handler_max_ms=%.1f free_heap=%u\n",
-            frames_*1000.0/elapsed,unsigned(flushes_),double(flushUs_)/1000,maxHandlerUs_/1000.0,unsigned(ESP.getFreeHeap()));
-        statsAt_=now;flushUs_=0;flushes_=frames_=maxHandlerUs_=0;
+        maxHandlerUs_=std::max(maxHandlerUs_,elapsedUs);uint32_t now=millis(),elapsed=now-statsAt_;if(elapsed<5000)return;
+        if(Serial&&Serial.availableForWrite()>=240)Serial.printf(
+            "[HUD-PERF] mode=%s te=%u full_hz=%.1f numeric_hz=%.1f regions=%u bytes_kb=%.1f dma_ms=%.1f te_wait_ms=%.1f te_timeouts=%u handler_max_ms=%.1f free_heap=%u\n",
+            direct_?"direct":"fallback",teReady_?1u:0u,fullFrames_*1000.0/elapsed,numericFrames_*1000.0/elapsed,unsigned(regions_),transferBytes_/1024.0,
+            transferUs_/1000.0,teWaitUs_/1000.0,unsigned(teTimeouts_),maxHandlerUs_/1000.0,unsigned(ESP.getFreeHeap()));
+        statsAt_=now;transferBytes_=transferUs_=teWaitUs_=0;regions_=fullFrames_=numericFrames_=teTimeouts_=maxHandlerUs_=0;
     }
 };
+
 }

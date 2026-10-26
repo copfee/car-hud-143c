@@ -232,8 +232,8 @@ void setup(){
     shared.bluetooth.saved=decodePeer(prefs.getString("ble_peer","").c_str());shared.bluetooth.target=shared.bluetooth.saved;
     if(validPeer(shared.bluetooth.saved))shared.bluetooth.detail="已保存 / 下次开机自动连接";
     board.setBrightness(effectiveBrightness(Mode::Splash,shared.brightness));board.setMirror(shared.mirror);ui.create();
-    // The panel flush is synchronous, so all black splash pixels are visible before timing starts.
-    lv_refr_now(lv_display_get_default());splash.start(millis());
+    lv_refr_now(lv_display_get_default());board.waitDisplayIdle(); // Start timing only after the first frame reaches the panel.
+    splash.start(millis());
     if(xTaskCreatePinnedToCore(worker,"obd-owner",12288,nullptr,1,nullptr,0)!=pdPASS||
        xTaskCreatePinnedToCore(telemetry,"device-info",4096,nullptr,1,nullptr,0)!=pdPASS)abort();
 }
@@ -244,7 +244,7 @@ void loop(){
     uint32_t now=millis();
     if(splash.takeCompletion(now)){
         auto black=snapshot();black.splashElapsed=SplashDurationMs;ui.refresh(black,now,0);
-        lv_refr_now(lv_display_get_default()); // Synchronous black flush before restoring user luminance.
+        lv_refr_now(lv_display_get_default());board.waitDisplayIdle();
         board.setBrightness(effectiveBrightness(Mode::Loading,black.brightness));
         if(validPeer(black.bluetooth.saved))attempt();else openBluetoothPicker();
     }
@@ -276,7 +276,7 @@ void loop(){
         if(validPeer(snapshot().bluetooth.target))attempt();else openBluetoothPicker();demoActive=false;
     }else if(action==Action::Identity)identityRequested=true;
     if(settingsDirty&&uint32_t(now-lastSettingChange)>=500){auto s=snapshot();PreferencesLock guard;prefs.putInt("brightness",s.brightness);prefs.putBool("mirror",s.mirror);prefs.putUChar("profile",unsigned(s.profile));prefs.putUChar("protocol",s.requestedProtocol);prefs.putUChar("schema",1);settingsDirty=false;}
-    if(uint32_t(now-last)>=33){
+    if(uint32_t(now-last)>=16){
         Snapshot s;
         {Lock guard;
             shared.splashElapsed=splash.elapsed(now);
@@ -285,7 +285,9 @@ void loop(){
             if(demoActive&&shared.demo&&uint32_t(now-lastDemo)>=100){demo.tick(shared,now,double(uint32_t(now-lastDemo))/1000);lastDemo=now;}
             animate(shared,now,uint32_t(now-last));s=shared;
         }
+        board.setNumericPage((s.mode==Mode::Live||s.mode==Mode::Demo)&&unsigned(s.page)<2?int(s.page):-1);
         ui.refresh(s,now,uint32_t(now-attemptStart.load()));last=now;
     }
-    uint32_t handlerStarted=micros();lv_timer_handler();board.profileHandler(uint32_t(micros()-handlerStarted));delay(3);
+    uint32_t handlerStarted=micros();lv_timer_handler();board.waitDisplayIdle();
+    board.profileHandler(uint32_t(micros()-handlerStarted));delay(3);
 }

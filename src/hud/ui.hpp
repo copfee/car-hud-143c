@@ -32,7 +32,7 @@ private:
     lv_obj_t *profileSelect_=nullptr,*protocolSelect_=nullptr,*model_=nullptr,*vin_=nullptr,*ecuName_=nullptr,*identityState_=nullptr,*availability_=nullptr;
     Mode displayed_=Mode::Timeout;
     Action action_=Action::None;
-    uint32_t lastNumbers_=0,lastInfo_=0;
+    uint32_t lastNumbers_=0,lastDynamics_=0,lastInfo_=0;
     bool demo_=false;
     bool scrolling_=false, settingsScrolling_=false, visualStateKnown_=false, previousDemo_=false;
     int previousPage_=-1;
