@@ -133,6 +133,11 @@ int main(int argc,char** argv){
     assert(text(lv_screen_active(),"~63%")&&text(lv_screen_active(),"3.92 V / 未充电"));
     assert(text(lv_screen_active(),"演示模式\n实车连接已停止"));
     auto* viewport=lv_obj_get_parent(text(lv_screen_active(),"开发板电池"));
+    auto* batteryTitle=text(viewport,"开发板电池");
+    auto* batteryRow=lv_obj_get_child(viewport,lv_obj_get_index(batteryTitle)+1);
+    auto* batteryIconBox=lv_obj_get_child(batteryRow,1);
+    auto* batteryBody=lv_obj_get_child(batteryIconBox,0);auto* batteryTerminal=lv_obj_get_child(batteryIconBox,1);
+    assert(lv_obj_get_y(batteryBody)+lv_obj_get_height(batteryBody)/2==lv_obj_get_y(batteryTerminal)+lv_obj_get_height(batteryTerminal)/2);
     assert(lv_obj_get_scroll_dir(viewport)==LV_DIR_VER);
     assert(lv_obj_has_flag(viewport,LV_OBJ_FLAG_SCROLL_MOMENTUM));
     auto* slider=object(viewport,&lv_slider_class);assert(slider&&!lv_obj_has_flag(slider,LV_OBJ_FLAG_SCROLL_CHAIN_HOR));

@@ -190,6 +190,7 @@ void Interface::createSettings(lv_obj_t* page){
     section("开发板电池");
     auto* batteryRow=row(36);batteryValue_=flowText(batteryRow,"--",200,White,&lv_font_montserrat_32);
     auto* iconBox=flowBox(batteryRow,44,22,LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(iconBox,LV_FLEX_ALIGN_START,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
     auto* icon=lv_obj_create(iconBox);lv_obj_remove_style_all(icon);lv_obj_set_size(icon,37,20);
     lv_obj_set_style_border_width(icon,2,0);lv_obj_set_style_border_color(icon,lv_color_hex(Muted),0);lv_obj_set_style_radius(icon,3,0);
     lv_obj_remove_flag(icon,lv_obj_flag_t(LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE));
