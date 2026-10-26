@@ -60,7 +60,9 @@
 
 这是**仅含源码的仓库**：不提交预编译BIN、`.pio`、虚拟环境、运行日志与测试生成结果。README使用的少量界面插图位于`docs/images/`。字体/Logo的C资源为编译所需的静态源文件，随源码提供。
 
-先安装 **Python 3.10+**。下面的脚本适用于 macOS/Linux 的 Bash 环境；第一次运行会在本地虚拟环境安装固定版本的 esptool、PlatformIO、板卡和库，需要联网。
+先安装 **Python 3.10+**。macOS/Linux 使用 Bash 脚本，Windows 11 使用根目录下功能对应的 PowerShell 脚本。第一次运行会在本地虚拟环境安装固定版本的 esptool、PlatformIO、板卡和库，需要联网；以后复用 `.tools` 和 `.pio` 中的缓存。
+
+### macOS / Linux
 
 ```bash
 git clone https://github.com/copfee/car-hud-143c.git
@@ -82,6 +84,36 @@ cd car-hud-143c
 ./flash.sh --port /dev/cu.usbmodemXXXX --baud 460800
 ```
 
+### Windows 11
+
+在 PowerShell 中运行；不要在 `cmd.exe` 中直接执行 `.ps1`：
+
+```powershell
+git clone https://github.com/copfee/car-hud-143c.git
+Set-Location car-hud-143c
+
+# 从源码构建，生成本机固件
+.\build.ps1
+
+# 仅校验刚生成的固件，不连接或烧录硬件
+.\flash.ps1 -VerifyOnly
+
+# 连接开发板后烧录：自动选择唯一 USB 串口
+.\flash.ps1
+```
+
+有多个串口时使用设备管理器中显示的 COM 端口：
+
+```powershell
+.\flash.ps1 -Port COM3 -Baud 460800
+```
+
+若系统策略禁止执行本地脚本，可只为当前 PowerShell 进程放开，然后重新运行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
 - 完整镜像：`firmware/car-hud-143c-full.bin`（本地构建生成），**烧录地址 `0x0`**。
 - 独立应用：`firmware/application.bin`，地址 `0x10000`，不能拿它代替完整镜像写到 `0x0`。
 - 校验与版本：`firmware/SHA256SUMS`、`firmware/manifest.json`（均由本地构建生成）。
@@ -94,11 +126,15 @@ cd car-hud-143c
 python -m esptool --chip esp32s3 --port COM3 --baud 460800 write_flash --flash_mode keep --flash_freq keep --flash_size 8MB 0x0 firmware/car-hud-143c-full.bin
 ```
 
+本项目是 **PlatformIO + Arduino** 工程，不是可直接运行 `idf.py build` 的原生 ESP-IDF 工程。已安装 ESP-IDF 时，可以用其中的 esptool 烧录已经生成的完整 BIN，但从源码构建仍由上述脚本调用 PlatformIO；PlatformIO 第一次使用时会下载项目锁定的框架、工具链和库。
+
 固件不会由本仓库工具自动烧录；只有主动执行烧录命令才会写入开发板。
 
 ## 从源码构建
 
-需要 Python 3.10+ 和网络；原生测试另外需要 CMake 3.19+、C/C++17 编译器。macOS 可使用 Command Line Tools，Linux 可使用 GCC/Clang。ESP32 工具链由 PlatformIO 下载。
+需要 Python 3.10+ 和网络；原生测试另外需要 CMake 3.19+、C/C++17 编译器。macOS 可使用 Command Line Tools，Linux 可使用 GCC/Clang，Windows 可使用 Visual Studio 2022 C++ Build Tools。ESP32 工具链由 PlatformIO 下载。
+
+macOS / Linux：
 
 ```bash
 # 首次先构建，安装板卡和 LVGL 等依赖
@@ -111,7 +147,20 @@ python -m esptool --chip esp32s3 --port COM3 --baud 460800 write_flash --flash_m
 ./flash.sh --verify-only
 ```
 
-`build.sh` 会生成车型静态表、编译 `waveshare_amoled_143c`、合并镜像并更新 SHA-256。普通构建不需要安装 Node.js、字体转换器或 PNG 解码器，字体和 Logo 的 C 资源已经提交。`tools/reproducible_paths.py` 映射编译路径，避免在固件诊断字符串中写入本机绝对路径。
+Windows 11 PowerShell：
+
+```powershell
+# 首次先构建，安装板卡和 LVGL 等依赖
+.\build.ps1
+
+# 安装 CMake 和 Visual Studio C++ Build Tools 后运行原生/Python测试
+.\test.ps1
+
+# 校验合并镜像
+.\flash.ps1 -VerifyOnly
+```
+
+`build.sh` 与 `build.ps1` 会生成车型静态表、编译 `waveshare_amoled_143c`、合并镜像并更新 SHA-256。两套脚本输出相同的 `firmware/car-hud-143c-full.bin`；`flash.sh` 与 `flash.ps1` 在烧录前都会校验清单。普通构建不需要安装 Node.js、字体转换器或 PNG 解码器，字体和 Logo 的 C 资源已经提交。`tools/reproducible_paths.py` 映射编译路径，避免在固件诊断字符串中写入本机绝对路径。
 
 |依赖|固定版本|
 |---|---|
@@ -124,7 +173,7 @@ python -m esptool --chip esp32s3 --port COM3 --baud 460800 write_flash --flash_m
 |NimBLE-Arduino|2.2.3|
 |esptool|4.8.1|
 
-配置见 [`platformio.ini`](platformio.ini)。`tools/common.sh` 管理虚拟环境；可通过 `HUD_PYTHON` 和 `PLATFORMIO_CORE_DIR` 指定自己的解释器与 PlatformIO 缓存。
+配置见 [`platformio.ini`](platformio.ini)。`tools/common.sh` 和 `tools/common.ps1` 分别管理两种环境的虚拟环境；可通过 `HUD_PYTHON` 和 `PLATFORMIO_CORE_DIR` 指定自己的解释器与 PlatformIO 缓存。
 
 只运行 Python 单元测试（不需要蓝牙设备或板卡）：
 
@@ -132,7 +181,13 @@ python -m esptool --chip esp32s3 --port COM3 --baud 460800 write_flash --flash_m
 python3 -m unittest discover -v -s tests -p 'test_*.py'
 ```
 
-构建后可使用 `python -m platformio device monitor -b 115200` 观察串口；使用项目虚拟环境时将 `python` 换成 `.tools/venv/bin/python`。
+Windows PowerShell 对应命令：
+
+```powershell
+.\.tools\venv\Scripts\python.exe -m unittest discover -v -s tests -p "test_*.py"
+```
+
+构建后可使用 `python -m platformio device monitor -b 115200` 观察串口；项目虚拟环境解释器在 macOS/Linux 为 `.tools/venv/bin/python`，Windows 为 `.tools\venv\Scripts\python.exe`。
 
 ## 开机、操作与连接恢复
 
